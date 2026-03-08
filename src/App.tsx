@@ -7,6 +7,7 @@ import { PublicationsPage } from '@/pages/PublicationsPage';
 import { ReportsPage } from '@/pages/ReportsPage';
 import { ProfessorRequestsPage } from '@/pages/ProfessorRequestsPage';
 import { AdminNotificationsPage } from '@/pages/AdminNotificationsPage';
+import { SubjectsPage } from '@/pages/SubjectsPage';
 import type { ReactNode } from 'react';
 import {
     LayoutDashboardIcon,
@@ -17,6 +18,7 @@ import {
     AlertTriangleIcon,
     GraduationCapIcon,
     BellIcon,
+    BookOpenIcon,
 } from 'lucide-react';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -50,6 +52,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
         { to: '/reports', icon: AlertTriangleIcon, label: 'Reportes' },
         { to: '/professor-requests', icon: GraduationCapIcon, label: 'Profesores' },
         { to: '/notifications', icon: BellIcon, label: 'Notificaciones' },
+        { to: '/subjects', icon: BookOpenIcon, label: 'Materias' },
     ];
 
     return (
@@ -164,6 +167,14 @@ export function App() {
                         element={
                             <ProtectedRoute>
                                 <AdminLayout><AdminNotificationsPage /></AdminLayout>
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/subjects"
+                        element={
+                            <ProtectedRoute>
+                                <AdminLayout><SubjectsPage /></AdminLayout>
                             </ProtectedRoute>
                         }
                     />
