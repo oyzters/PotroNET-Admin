@@ -1,30 +1,46 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { ShieldIcon, LogInIcon } from 'lucide-react';
+import { ShieldIcon, LogInIcon, ShieldAlertIcon } from 'lucide-react';
 
 export function LoginPage() {
-    const { signIn } = useAuth();
+    const { signIn, isAdmin, profileLoading, authError, clearAuthError } = useAuth();
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [formError, setFormError] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+
+    // ✅ Navigate as soon as isAdmin becomes true after a sign-in attempt
+    useEffect(() => {
+        if (isAdmin && !profileLoading) {
+            navigate('/dashboard', { replace: true });
+        }
+    }, [isAdmin, profileLoading, navigate]);
+
+    // Show auth errors from the context (e.g. insufficient role)
+    const displayError = authError || formError;
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
-        setError('');
-        setLoading(true);
+        setFormError('');
+        clearAuthError();
+        setSubmitting(true);
 
         try {
             await signIn(email, password);
-            navigate('/dashboard');
+            // Don't navigate here — the useEffect above handles it
+            // once onAuthStateChange + fetchProfile resolve
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
-        } finally {
-            setLoading(false);
+            setFormError(err instanceof Error ? err.message : 'Credenciales incorrectas');
+            setSubmitting(false);
         }
+        // Note: setSubmitting(false) is NOT called on success path intentionally;
+        // the spinner stays while profileLoading is true, then navigate fires.
     };
+
+    // While Supabase has authenticated but profile is still being fetched, keep showing spinner
+    const isLoading = submitting || profileLoading;
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -47,9 +63,11 @@ export function LoginPage() {
                     onSubmit={handleSubmit}
                     className="space-y-4 rounded-2xl border border-border bg-card p-6"
                 >
-                    {error && (
-                        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-                            {error}
+                    {/* Error display */}
+                    {displayError && (
+                        <div className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3">
+                            <ShieldAlertIcon className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                            <p className="text-sm text-destructive">{displayError}</p>
                         </div>
                     )}
 
@@ -60,8 +78,9 @@ export function LoginPage() {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
-                            className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
-                            placeholder="admin@potros.itson.edu.mx"
+                            disabled={isLoading}
+                            className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60"
+                            placeholder="sudo@potros.itson.edu.mx"
                         />
                     </div>
 
@@ -72,18 +91,22 @@ export function LoginPage() {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
-                            className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+                            disabled={isLoading}
+                            className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60"
                             placeholder="••••••••"
                         />
                     </div>
 
                     <button
                         type="submit"
-                        disabled={loading}
+                        disabled={isLoading}
                         className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
                     >
-                        {loading ? (
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                        {isLoading ? (
+                            <>
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                                Verificando acceso...
+                            </>
                         ) : (
                             <>
                                 <LogInIcon className="h-4 w-4" />
@@ -93,7 +116,7 @@ export function LoginPage() {
                     </button>
 
                     <p className="text-center text-xs text-muted-foreground">
-                        Solo cuentas con rol Admin o Sudo tienen acceso
+                        Solo cuentas con rol <strong>Sudo</strong> tienen acceso
                     </p>
                 </form>
             </div>
