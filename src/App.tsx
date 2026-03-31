@@ -7,6 +7,8 @@ import { PublicationsPage } from '@/pages/PublicationsPage';
 import { ReportsPage } from '@/pages/ReportsPage';
 import { ProfessorRequestsPage } from '@/pages/ProfessorRequestsPage';
 import { AdminNotificationsPage } from '@/pages/AdminNotificationsPage';
+import { ModerationLogPage } from '@/pages/ModerationLogPage';
+import { SystemSettingsPage } from '@/pages/SystemSettingsPage';
 import type { ReactNode } from 'react';
 import {
     LayoutDashboardIcon,
@@ -17,6 +19,8 @@ import {
     AlertTriangleIcon,
     GraduationCapIcon,
     BellIcon,
+    ClipboardListIcon,
+    SettingsIcon,
 } from 'lucide-react';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -50,6 +54,8 @@ function AdminLayout({ children }: { children: ReactNode }) {
         { to: '/reports', icon: AlertTriangleIcon, label: 'Reportes' },
         { to: '/professor-requests', icon: GraduationCapIcon, label: 'Profesores' },
         { to: '/notifications', icon: BellIcon, label: 'Notificaciones' },
+        { to: '/moderation-log', icon: ClipboardListIcon, label: 'Log de Moderación' },
+        { to: '/system-settings', icon: SettingsIcon, label: 'Ajustes del Sistema' },
     ];
 
     return (
@@ -90,7 +96,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
                 <div className="border-t border-border p-4">
                     <div className="mb-3 rounded-lg bg-accent/50 p-3">
                         <p className="text-sm font-medium">{profile?.full_name}</p>
-                        <p className="text-xs text-muted-foreground">{profile?.email}</p>
+                        <p className="text-xs text-muted-foreground">{profile?.email?.split('@')[0]}</p>
                         <span className="mt-1 inline-block rounded bg-primary/20 px-2 py-0.5 text-xs font-semibold text-primary">
                             {profile?.role?.toUpperCase()}
                         </span>
@@ -164,6 +170,22 @@ export function App() {
                         element={
                             <ProtectedRoute>
                                 <AdminLayout><AdminNotificationsPage /></AdminLayout>
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/moderation-log"
+                        element={
+                            <ProtectedRoute>
+                                <AdminLayout><ModerationLogPage /></AdminLayout>
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/system-settings"
+                        element={
+                            <ProtectedRoute>
+                                <AdminLayout><SystemSettingsPage /></AdminLayout>
                             </ProtectedRoute>
                         }
                     />
