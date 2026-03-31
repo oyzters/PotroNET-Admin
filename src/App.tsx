@@ -9,6 +9,9 @@ import { ProfessorRequestsPage } from '@/pages/ProfessorRequestsPage';
 import { AdminNotificationsPage } from '@/pages/AdminNotificationsPage';
 import { ModerationLogPage } from '@/pages/ModerationLogPage';
 import { SystemSettingsPage } from '@/pages/SystemSettingsPage';
+import { SubjectsPage } from '@/pages/SubjectsPage';
+import { MobileBlockedScreen } from '@/pages/MobileBlockedScreen';
+import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import {
     LayoutDashboardIcon,
@@ -21,6 +24,7 @@ import {
     BellIcon,
     ClipboardListIcon,
     SettingsIcon,
+    BookOpenIcon,
 } from 'lucide-react';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -35,6 +39,22 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
     }
 
     if (!profile || !isAdmin) return <Navigate to="/login" replace />;
+    return <>{children}</>;
+}
+
+function DesktopOnlyGuard({ children }: { children: ReactNode }) {
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 1024);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    if (isMobile) {
+        return <MobileBlockedScreen />;
+    }
+
     return <>{children}</>;
 }
 
@@ -56,6 +76,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
         { to: '/notifications', icon: BellIcon, label: 'Notificaciones' },
         { to: '/moderation-log', icon: ClipboardListIcon, label: 'Log de Moderación' },
         { to: '/system-settings', icon: SettingsIcon, label: 'Ajustes del Sistema' },
+        { to: '/subjects', icon: BookOpenIcon, label: 'Materias' },
     ];
 
     return (
@@ -123,8 +144,9 @@ export function App() {
     return (
         <BrowserRouter>
             <AuthProvider>
-                <Routes>
-                    <Route path="/login" element={<LoginPage />} />
+                <DesktopOnlyGuard>
+                    <Routes>
+                        <Route path="/login" element={<LoginPage />} />
                     <Route
                         path="/dashboard"
                         element={
@@ -189,8 +211,17 @@ export function App() {
                             </ProtectedRoute>
                         }
                     />
+                    <Route
+                        path="/subjects"
+                        element={
+                            <ProtectedRoute>
+                                <AdminLayout><SubjectsPage /></AdminLayout>
+                            </ProtectedRoute>
+                        }
+                    />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                </Routes>
+                    </Routes>
+                </DesktopOnlyGuard>
             </AuthProvider>
         </BrowserRouter>
     );
