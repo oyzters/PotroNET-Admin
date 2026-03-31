@@ -10,6 +10,8 @@ import {
     UserCheckIcon,
     UserXIcon,
     UserIcon,
+    AlertTriangleIcon,
+    ShieldIcon,
 } from 'lucide-react';
 
 interface Stats {
@@ -18,6 +20,8 @@ interface Stats {
     totalCareers: number;
     bannedUsers: number;
     newUsersThisWeek: number;
+    pendingReports: number;
+    activeWarnings: number;
     usersByRole: {
         user: number;
         admin: number;
@@ -90,6 +94,20 @@ export function DashboardPage() {
             icon: TrendingUpIcon,
             color: 'text-violet-400',
             bg: 'bg-violet-400/10',
+        },
+        {
+            title: 'Reportes Pdt.',
+            value: stats?.pendingReports || 0,
+            icon: AlertTriangleIcon,
+            color: 'text-amber-500',
+            bg: 'bg-amber-500/10',
+        },
+        {
+            title: 'Advertencias Activas',
+            value: stats?.activeWarnings || 0,
+            icon: ShieldIcon,
+            color: 'text-orange-400',
+            bg: 'bg-orange-400/10',
         },
     ];
 

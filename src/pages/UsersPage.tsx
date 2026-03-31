@@ -25,6 +25,7 @@ interface UserProfile {
     semester: number;
     career: Career | null;
     created_at: string;
+    warnings?: [{ count: number }];
 }
 
 interface UsersResponse {
@@ -134,6 +135,7 @@ export function UsersPage() {
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Rol</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Estado</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Rep.</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Adv.</th>
                                 {isSudo && (
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Acciones</th>
                                 )}
@@ -183,6 +185,15 @@ export function UsersPage() {
                                         </td>
                                         <td className="px-4 py-3 text-sm">
                                             <span className="text-amber-400">★</span> {u.reputation}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm">
+                                            {u.warnings?.[0]?.count ? (
+                                                <span className="inline-flex items-center justify-center rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-500">
+                                                    {u.warnings[0].count}
+                                                </span>
+                                            ) : (
+                                                <span className="text-muted-foreground text-xs">0</span>
+                                            )}
                                         </td>
                                         {isSudo && (
                                             <td className="px-4 py-3">
