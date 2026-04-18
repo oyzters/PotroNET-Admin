@@ -4,7 +4,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { api } from '@/lib/api';
 import {
     PlusIcon, SearchIcon, PencilIcon, Trash2Icon, CheckIcon, XIcon,
-    StarIcon, GraduationCapIcon,
+    StarIcon, GraduationCapIcon, SparklesIcon,
 } from 'lucide-react';
 
 interface Career { id: string; name: string }
@@ -18,7 +18,18 @@ interface Professor {
     avg_rating: number | null;
     total_reviews: number | null;
     is_approved: boolean;
+    nickname: string | null;
     career?: Career | null;
+}
+
+interface NicknameSuggestion {
+    id: string;
+    professor_id: string;
+    nickname: string;
+    status: 'pending' | 'approved' | 'rejected';
+    created_at: string;
+    professor?: { id: string; full_name: string; nickname: string | null } | null;
+    suggester?: { id: string; full_name: string } | null;
 }
 
 interface ProfessorsResponse {
@@ -26,7 +37,7 @@ interface ProfessorsResponse {
     pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
-const EMPTY_FORM = { full_name: '', email: '', department: '', career_id: '', is_approved: true };
+const EMPTY_FORM = { full_name: '', email: '', department: '', career_id: '', is_approved: true, nickname: '' };
 
 export function ProfessorsPage() {
     const { session } = useAuth();
@@ -45,6 +56,39 @@ export function ProfessorsPage() {
     const [editForm, setEditForm] = useState(EMPTY_FORM);
     const [saving, setSaving] = useState(false);
     const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+
+    const [suggestions, setSuggestions] = useState<NicknameSuggestion[]>([]);
+    const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+    const [processingSuggestionId, setProcessingSuggestionId] = useState<string | null>(null);
+
+    const fetchSuggestions = useCallback(async () => {
+        if (!session?.access_token) return;
+        setSuggestionsLoading(true);
+        try {
+            const data = await api<{ suggestions: NicknameSuggestion[] }>('/admin/nickname-suggestions?status=pending', { token: session.access_token });
+            setSuggestions(data.suggestions);
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'No se pudieron cargar sugerencias');
+        } finally { setSuggestionsLoading(false); }
+    }, [session?.access_token, toast]);
+
+    useEffect(() => { fetchSuggestions(); }, [fetchSuggestions]);
+
+    const handleSuggestionAction = async (id: string, action: 'approve' | 'reject') => {
+        if (!session?.access_token) return;
+        setProcessingSuggestionId(id);
+        try {
+            await api('/admin/nickname-suggestions', {
+                method: 'PATCH', token: session.access_token,
+                body: JSON.stringify({ id, action }),
+            });
+            setSuggestions(prev => prev.filter(s => s.id !== id));
+            toast.success(action === 'approve' ? 'Apodo aprobado' : 'Sugerencia rechazada');
+            if (action === 'approve') fetchProfessors();
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Error al procesar sugerencia');
+        } finally { setProcessingSuggestionId(null); }
+    };
 
     const fetchProfessors = useCallback(async () => {
         if (!session?.access_token) return;
@@ -96,6 +140,7 @@ export function ProfessorsPage() {
             department: p.department || '',
             career_id: p.career_id || '',
             is_approved: p.is_approved,
+            nickname: p.nickname || '',
         });
     };
 
@@ -163,6 +208,58 @@ export function ProfessorsPage() {
                 </div>
             </div>
 
+            {(suggestionsLoading || suggestions.length > 0) && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                        <SparklesIcon className="h-4 w-4 text-amber-500" />
+                        <h3 className="text-sm font-semibold">Apodos sugeridos ({suggestions.length})</h3>
+                    </div>
+                    {suggestionsLoading ? (
+                        <p className="text-xs text-muted-foreground">Cargando…</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {suggestions.map(s => {
+                                const processing = processingSuggestionId === s.id;
+                                return (
+                                    <div key={s.id} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2">
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm">
+                                                <span className="font-semibold">{s.professor?.full_name || '—'}</span>
+                                                {s.professor?.nickname && (
+                                                    <span className="ml-2 text-xs text-muted-foreground">(actual: {s.professor.nickname})</span>
+                                                )}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Sugerido: <span className="font-semibold text-primary">{s.nickname}</span>
+                                                {s.suggester?.full_name && <span className="ml-2">por {s.suggester.full_name}</span>}
+                                            </p>
+                                        </div>
+                                        <div className="flex gap-1.5 shrink-0">
+                                            <button
+                                                onClick={() => handleSuggestionAction(s.id, 'approve')}
+                                                disabled={processing}
+                                                className="rounded p-1.5 text-emerald-500 hover:bg-emerald-500/10 disabled:opacity-40"
+                                                title="Aprobar y aplicar"
+                                            >
+                                                <CheckIcon className="h-4 w-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleSuggestionAction(s.id, 'reject')}
+                                                disabled={processing}
+                                                className="rounded p-1.5 text-red-500 hover:bg-red-500/10 disabled:opacity-40"
+                                                title="Rechazar"
+                                            >
+                                                <XIcon className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {showNew && (
                 <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
                     <div className="flex items-center justify-between">
@@ -199,6 +296,13 @@ export function ProfessorsPage() {
                             <option value="">Sin carrera</option>
                             {careers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
+                        <input
+                            placeholder='Apodo (opcional, ej: "El Terminator")'
+                            value={newForm.nickname}
+                            maxLength={40}
+                            onChange={e => setNewForm(f => ({ ...f, nickname: e.target.value }))}
+                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary sm:col-span-2"
+                        />
                     </div>
                     <div className="flex items-center justify-between">
                         <label className="flex items-center gap-2 text-sm">
@@ -255,6 +359,13 @@ export function ProfessorsPage() {
                                                         className="w-full rounded border border-border bg-background px-2 py-1 text-sm outline-none focus:border-primary"
                                                     />
                                                     <input
+                                                        placeholder="Apodo (opcional)"
+                                                        value={editForm.nickname}
+                                                        maxLength={40}
+                                                        onChange={e => setEditForm(f => ({ ...f, nickname: e.target.value }))}
+                                                        className="w-full rounded border border-primary/30 bg-primary/5 px-2 py-1 text-xs outline-none focus:border-primary"
+                                                    />
+                                                    <input
                                                         placeholder="Correo"
                                                         value={editForm.email}
                                                         onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))}
@@ -263,9 +374,14 @@ export function ProfessorsPage() {
                                                 </div>
                                             ) : (
                                                 <div>
-                                                    <p className="text-sm font-medium flex items-center gap-2">
+                                                    <p className="text-sm font-medium flex items-center gap-2 flex-wrap">
                                                         <GraduationCapIcon className="h-4 w-4 text-muted-foreground" />
-                                                        {p.full_name}
+                                                        <span>{p.full_name}</span>
+                                                        {p.nickname && (
+                                                            <span className="inline-flex items-center rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                                                                {p.nickname}
+                                                            </span>
+                                                        )}
                                                     </p>
                                                     {p.email && <p className="text-xs text-muted-foreground">{p.email}</p>}
                                                 </div>
