@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Fragment } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
 import { api } from '@/lib/api';
 import { PlusIcon, Trash2Icon, PencilIcon, CheckIcon, XIcon, BookOpenIcon } from 'lucide-react';
 
@@ -8,6 +9,7 @@ interface Subject { id: string; career_id: string; name: string; semester: numbe
 
 export function SubjectsPage() {
     const { session } = useAuth();
+    const toast = useToast();
     const [careers, setCareers] = useState<Career[]>([]);
     const [selectedCareer, setSelectedCareer] = useState<Career | null>(null);
     const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -17,43 +19,42 @@ export function SubjectsPage() {
     const [newForm, setNewForm] = useState({ name: '', semester: 1, credits: 0 });
     const [showNewRow, setShowNewRow] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState('');
+    const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
     useEffect(() => {
         if (!session?.access_token) return;
         api<{ careers: Career[] }>('/careers', { token: session.access_token })
             .then(d => setCareers(d.careers))
-            .catch(() => {});
-    }, [session?.access_token]);
+            .catch((e) => toast.error(e instanceof Error ? e.message : 'No se pudieron cargar las carreras'));
+    }, [session?.access_token, toast]);
 
     const fetchSubjects = useCallback(async (career: Career) => {
         if (!session?.access_token) return;
         setLoading(true);
-        setError('');
         try {
             const data = await api<{ subjects: Subject[] }>(
                 `/admin/subjects?career_id=${career.id}`,
                 { token: session.access_token }
             );
             setSubjects(data.subjects);
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : 'Error al cargar materias');
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Error al cargar materias');
         } finally {
             setLoading(false);
         }
-    }, [session?.access_token]);
+    }, [session?.access_token, toast]);
 
     const handleSelectCareer = (career: Career) => {
         setSelectedCareer(career);
         setShowNewRow(false);
         setEditingId(null);
+        setPendingDelete(null);
         fetchSubjects(career);
     };
 
     const handleAdd = async () => {
         if (!session?.access_token || !selectedCareer || !newForm.name.trim()) return;
         setSaving(true);
-        setError('');
         try {
             const data = await api<{ subject: Subject }>('/admin/subjects', {
                 method: 'POST',
@@ -65,8 +66,9 @@ export function SubjectsPage() {
             );
             setNewForm({ name: '', semester: 1, credits: 0 });
             setShowNewRow(false);
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : 'Error al agregar materia');
+            toast.success('Materia agregada');
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Error al agregar materia');
         } finally {
             setSaving(false);
         }
@@ -75,7 +77,6 @@ export function SubjectsPage() {
     const handleSaveEdit = async (id: string) => {
         if (!session?.access_token) return;
         setSaving(true);
-        setError('');
         try {
             const data = await api<{ subject: Subject }>('/admin/subjects', {
                 method: 'PATCH',
@@ -87,22 +88,29 @@ export function SubjectsPage() {
                     .sort((a, b) => a.semester - b.semester || a.name.localeCompare(b.name))
             );
             setEditingId(null);
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : 'Error al guardar cambios');
+            toast.success('Materia actualizada');
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Error al guardar cambios');
         } finally {
             setSaving(false);
         }
     };
 
-    const handleDelete = async (id: string, name: string) => {
+    const handleDelete = async (id: string) => {
         if (!session?.access_token) return;
-        if (!confirm(`¿Eliminar "${name}"? Esto borrará también el progreso de todos los usuarios en esta materia.`)) return;
-        setError('');
+        // Two-step inline confirm: first click sets pendingDelete, second click actually deletes
+        if (pendingDelete !== id) {
+            setPendingDelete(id);
+            window.setTimeout(() => setPendingDelete((current) => current === id ? null : current), 4000);
+            return;
+        }
         try {
             await api(`/admin/subjects?id=${id}`, { method: 'DELETE', token: session.access_token });
             setSubjects(prev => prev.filter(s => s.id !== id));
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : 'Error al eliminar materia');
+            setPendingDelete(null);
+            toast.success('Materia eliminada');
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Error al eliminar materia');
         }
     };
 
@@ -150,7 +158,7 @@ export function SubjectsPage() {
                         <div className="flex items-center gap-3">
                             <span className="text-sm text-muted-foreground">{subjects.length} materias</span>
                             <button
-                                onClick={() => { setShowNewRow(true); setEditingId(null); }}
+                                onClick={() => { setShowNewRow(true); setEditingId(null); setPendingDelete(null); }}
                                 className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                             >
                                 <PlusIcon className="h-4 w-4" />
@@ -158,12 +166,6 @@ export function SubjectsPage() {
                             </button>
                         </div>
                     </div>
-
-                    {error && (
-                        <div className="rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-400">
-                            {error}
-                        </div>
-                    )}
 
                     {loading ? (
                         <div className="flex justify-center py-12">
@@ -177,7 +179,7 @@ export function SubjectsPage() {
                                         <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Materia</th>
                                         <th className="w-28 px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Semestre</th>
                                         <th className="w-24 px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Créditos</th>
-                                        <th className="w-24 px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Acciones</th>
+                                        <th className="w-32 px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -215,7 +217,7 @@ export function SubjectsPage() {
                                                     <button
                                                         onClick={handleAdd}
                                                         disabled={saving || !newForm.name.trim()}
-                                                        className="rounded p-1.5 text-emerald-400 hover:bg-emerald-400/10 disabled:opacity-40"
+                                                        className="rounded p-1.5 text-emerald-500 hover:bg-emerald-500/10 disabled:opacity-40"
                                                     >
                                                         <CheckIcon className="h-4 w-4" />
                                                     </button>
@@ -238,89 +240,99 @@ export function SubjectsPage() {
                                         </tr>
                                     ) : (
                                         semesterNumbers.map(sem => (
-                                            <>
-                                                <tr key={`sem-${sem}`} className="bg-accent/20">
+                                            <Fragment key={`sem-${sem}`}>
+                                                <tr className="bg-accent/20">
                                                     <td colSpan={4} className="px-4 py-1.5 text-xs font-semibold text-muted-foreground">
                                                         Semestre {sem}
                                                     </td>
                                                 </tr>
-                                                {semesters[sem].map(subject => (
-                                                    <tr key={subject.id} className="group border-b border-border last:border-0 hover:bg-accent/20">
-                                                        <td className="px-4 py-2.5">
-                                                            {editingId === subject.id ? (
-                                                                <input
-                                                                    autoFocus
-                                                                    type="text"
-                                                                    value={editForm.name}
-                                                                    onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
-                                                                    onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(subject.id); if (e.key === 'Escape') setEditingId(null); }}
-                                                                    className="w-full rounded border border-border bg-background px-2 py-1 text-sm outline-none focus:border-primary"
-                                                                />
-                                                            ) : (
-                                                                <span className="text-sm">{subject.name}</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-4 py-2.5">
-                                                            {editingId === subject.id ? (
-                                                                <input
-                                                                    type="number" min={1} max={12}
-                                                                    value={editForm.semester}
-                                                                    onChange={e => setEditForm(f => ({ ...f, semester: Number(e.target.value) }))}
-                                                                    className="w-full rounded border border-border bg-background px-2 py-1 text-sm outline-none focus:border-primary"
-                                                                />
-                                                            ) : (
-                                                                <span className="text-sm text-muted-foreground">{subject.semester}</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-4 py-2.5">
-                                                            {editingId === subject.id ? (
-                                                                <input
-                                                                    type="number" min={0}
-                                                                    value={editForm.credits}
-                                                                    onChange={e => setEditForm(f => ({ ...f, credits: Number(e.target.value) }))}
-                                                                    className="w-full rounded border border-border bg-background px-2 py-1 text-sm outline-none focus:border-primary"
-                                                                />
-                                                            ) : (
-                                                                <span className="text-sm text-muted-foreground">{subject.credits}</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-4 py-2.5">
-                                                            {editingId === subject.id ? (
-                                                                <div className="flex gap-1">
+                                                {semesters[sem].map(subject => {
+                                                    const isPending = pendingDelete === subject.id;
+                                                    return (
+                                                        <tr key={subject.id} className="group border-b border-border last:border-0 hover:bg-accent/20">
+                                                            <td className="px-4 py-2.5">
+                                                                {editingId === subject.id ? (
+                                                                    <input
+                                                                        autoFocus
+                                                                        type="text"
+                                                                        value={editForm.name}
+                                                                        onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                                                                        onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(subject.id); if (e.key === 'Escape') setEditingId(null); }}
+                                                                        className="w-full rounded border border-border bg-background px-2 py-1 text-sm outline-none focus:border-primary"
+                                                                    />
+                                                                ) : (
+                                                                    <span className="text-sm">{subject.name}</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-4 py-2.5">
+                                                                {editingId === subject.id ? (
+                                                                    <input
+                                                                        type="number" min={1} max={12}
+                                                                        value={editForm.semester}
+                                                                        onChange={e => setEditForm(f => ({ ...f, semester: Number(e.target.value) }))}
+                                                                        className="w-full rounded border border-border bg-background px-2 py-1 text-sm outline-none focus:border-primary"
+                                                                    />
+                                                                ) : (
+                                                                    <span className="text-sm text-muted-foreground">{subject.semester}</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-4 py-2.5">
+                                                                {editingId === subject.id ? (
+                                                                    <input
+                                                                        type="number" min={0}
+                                                                        value={editForm.credits}
+                                                                        onChange={e => setEditForm(f => ({ ...f, credits: Number(e.target.value) }))}
+                                                                        className="w-full rounded border border-border bg-background px-2 py-1 text-sm outline-none focus:border-primary"
+                                                                    />
+                                                                ) : (
+                                                                    <span className="text-sm text-muted-foreground">{subject.credits}</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-4 py-2.5">
+                                                                {editingId === subject.id ? (
+                                                                    <div className="flex gap-1">
+                                                                        <button
+                                                                            onClick={() => handleSaveEdit(subject.id)}
+                                                                            disabled={saving}
+                                                                            className="rounded p-1.5 text-emerald-500 hover:bg-emerald-500/10 disabled:opacity-40"
+                                                                        >
+                                                                            <CheckIcon className="h-4 w-4" />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => setEditingId(null)}
+                                                                            className="rounded p-1.5 text-muted-foreground hover:bg-accent"
+                                                                        >
+                                                                            <XIcon className="h-4 w-4" />
+                                                                        </button>
+                                                                    </div>
+                                                                ) : isPending ? (
                                                                     <button
-                                                                        onClick={() => handleSaveEdit(subject.id)}
-                                                                        disabled={saving}
-                                                                        className="rounded p-1.5 text-emerald-400 hover:bg-emerald-400/10 disabled:opacity-40"
+                                                                        onClick={() => handleDelete(subject.id)}
+                                                                        className="rounded-md bg-red-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-600"
                                                                     >
-                                                                        <CheckIcon className="h-4 w-4" />
+                                                                        Confirmar
                                                                     </button>
-                                                                    <button
-                                                                        onClick={() => setEditingId(null)}
-                                                                        className="rounded p-1.5 text-muted-foreground hover:bg-accent"
-                                                                    >
-                                                                        <XIcon className="h-4 w-4" />
-                                                                    </button>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                                                                    <button
-                                                                        onClick={() => { setEditingId(subject.id); setEditForm({ name: subject.name, semester: subject.semester, credits: subject.credits }); }}
-                                                                        className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                                                                    >
-                                                                        <PencilIcon className="h-3.5 w-3.5" />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleDelete(subject.id, subject.name)}
-                                                                        className="rounded p-1.5 text-muted-foreground hover:bg-red-400/10 hover:text-red-400"
-                                                                    >
-                                                                        <Trash2Icon className="h-3.5 w-3.5" />
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </>
+                                                                ) : (
+                                                                    <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                                                                        <button
+                                                                            onClick={() => { setEditingId(subject.id); setEditForm({ name: subject.name, semester: subject.semester, credits: subject.credits }); setPendingDelete(null); }}
+                                                                            className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                                                                        >
+                                                                            <PencilIcon className="h-3.5 w-3.5" />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleDelete(subject.id)}
+                                                                            className="rounded p-1.5 text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
+                                                                        >
+                                                                            <Trash2Icon className="h-3.5 w-3.5" />
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </Fragment>
                                         ))
                                     )}
                                 </tbody>

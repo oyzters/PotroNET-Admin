@@ -11,12 +11,14 @@ interface SentNotification { id: string; content: string; type: string; created_
 
 type TargetType = 'global' | 'career' | 'user';
 
+const ALLOWED_DOMAIN = '@potros.itson.edu.mx';
+
 export function AdminNotificationsPage() {
     const { session } = useAuth();
     const [message, setMessage] = useState('');
     const [targetType, setTargetType] = useState<TargetType>('global');
     const [careerId, setCareerId] = useState('');
-    const [userId, setUserId] = useState('');
+    const [userEmailPrefix, setUserEmailPrefix] = useState('');
     const [careers, setCareers] = useState<Career[]>([]);
     const [sending, setSending] = useState(false);
     const [result, setResult] = useState<{ sent?: number; error?: string } | null>(null);
@@ -46,13 +48,13 @@ export function AdminNotificationsPage() {
     const handleSend = async () => {
         if (!session?.access_token || !message.trim()) return;
         if (targetType === 'career' && !careerId) { setResult({ error: 'Selecciona una carrera' }); return; }
-        if (targetType === 'user' && !userId.trim()) { setResult({ error: 'Ingresa un user ID' }); return; }
+        if (targetType === 'user' && !userEmailPrefix.trim()) { setResult({ error: 'Ingresa el correo del usuario' }); return; }
         setSending(true);
         setResult(null);
         try {
             const body: Record<string, string> = { message: message.trim(), target_type: targetType };
             if (targetType === 'career') body.career_id = careerId;
-            if (targetType === 'user') body.user_id = userId.trim();
+            if (targetType === 'user') body.user_email = userEmailPrefix.trim().toLowerCase() + ALLOWED_DOMAIN;
             const data = await api<{ sent: number }>('/admin/notifications', {
                 method: 'POST', token: session.access_token,
                 body: JSON.stringify(body),
@@ -118,17 +120,22 @@ export function AdminNotificationsPage() {
                     </div>
                 )}
 
-                {/* User ID input */}
+                {/* User email input */}
                 {targetType === 'user' && (
                     <div className="space-y-2">
-                        <label className="text-sm font-medium">User ID</label>
-                        <input
-                            type="text"
-                            placeholder="UUID del usuario..."
-                            value={userId}
-                            onChange={e => setUserId(e.target.value)}
-                            className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
-                        />
+                        <label className="text-sm font-medium">Correo del usuario</label>
+                        <div className="flex items-center overflow-hidden rounded-lg border border-border focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+                            <input
+                                type="text"
+                                placeholder="tu.nombreID"
+                                value={userEmailPrefix}
+                                onChange={e => setUserEmailPrefix(e.target.value.replace(/\s/g, ''))}
+                                className="min-w-0 flex-1 bg-background px-3 py-2.5 text-sm outline-none"
+                            />
+                            <span className="shrink-0 select-none border-l border-border bg-muted px-3 py-2.5 text-sm text-muted-foreground">
+                                {ALLOWED_DOMAIN}
+                            </span>
+                        </div>
                     </div>
                 )}
 

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
 import { api } from '@/lib/api';
 import { TrashIcon, AlertTriangleIcon, SearchIcon, XIcon, ShieldAlertIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ const CATEGORIES = [
 
 export function PublicationsPage() {
     const { session } = useAuth();
+    const toast = useToast();
     const [publications, setPublications] = useState<Publication[]>([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
@@ -54,8 +56,10 @@ export function PublicationsPage() {
             setPublications(data.publications);
             setTotalPages(data.pagination.totalPages);
             setTotal(data.pagination.total);
-        } catch { /* */ } finally { setLoading(false); }
-    }, [session?.access_token, page, search]);
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'No se pudieron cargar las publicaciones');
+        } finally { setLoading(false); }
+    }, [session?.access_token, page, search, toast]);
 
     useEffect(() => { fetchPublications(); }, [fetchPublications]);
 
@@ -73,7 +77,10 @@ export function PublicationsPage() {
             setDeletingPub(null);
             setDeleteCategory('');
             setDeleteReason('');
-        } catch { /* */ } finally { setIsDeleting(false); }
+            toast.success('Publicación eliminada');
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'No se pudo eliminar');
+        } finally { setIsDeleting(false); }
     };
 
     const timeAgo = (dateStr: string) => {

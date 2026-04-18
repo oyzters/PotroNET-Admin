@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
 import { api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +36,7 @@ const TYPE_ICONS: Record<string, typeof AlertTriangleIcon> = { publication: File
 
 export function ReportsPage() {
     const { session } = useAuth();
+    const toast = useToast();
     const [reports, setReports] = useState<Report[]>([]);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('pending');
@@ -56,8 +58,10 @@ export function ReportsPage() {
             const data = await api<ReportsResponse>(`/admin/reports?${params}`, { token: session.access_token });
             setReports(data.reports);
             setTotalPages(data.pagination.totalPages);
-        } catch { /* silent */ } finally { setLoading(false); }
-    }, [session?.access_token, page, statusFilter]);
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'No se pudieron cargar los reportes');
+        } finally { setLoading(false); }
+    }, [session?.access_token, page, statusFilter, toast]);
 
     useEffect(() => { fetchReports(); }, [fetchReports]);
 
