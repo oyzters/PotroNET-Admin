@@ -13,6 +13,7 @@ interface Career { id: string; name: string }
 interface ProfessorRequest {
     id: string; professor_name: string; department: string;
     reason: string; status: string; created_at: string;
+    nickname: string | null;
     requester: Requester; career: Career | null;
 }
 interface RequestsResponse {
@@ -91,8 +92,13 @@ export function ProfessorRequestsPage() {
                                         <GraduationCapIcon className="h-6 w-6 text-primary" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                             <h3 className="font-semibold">{r.professor_name}</h3>
+                                            {r.nickname && (
+                                                <span className="inline-flex items-center rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                                                    {r.nickname}
+                                                </span>
+                                            )}
                                             <Badge className={STATUS_COLORS[r.status]}>{STATUS_LABELS[r.status]}</Badge>
                                         </div>
                                         {r.department && <p className="text-sm text-muted-foreground">{r.department}</p>}
