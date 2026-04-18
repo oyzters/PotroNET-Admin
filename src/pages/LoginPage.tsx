@@ -3,13 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { ShieldIcon, LogInIcon, ShieldAlertIcon } from 'lucide-react';
 
+const ALLOWED_DOMAIN = '@potros.itson.edu.mx';
+
 export function LoginPage() {
     const { signIn, isAdmin, profileLoading, authError, clearAuthError } = useAuth();
     const navigate = useNavigate();
-    const [email, setEmail] = useState('');
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [formError, setFormError] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const email = username.trim().toLowerCase() + ALLOWED_DOMAIN;
 
     // ✅ Navigate as soon as isAdmin becomes true after a sign-in attempt
     useEffect(() => {
@@ -73,15 +76,20 @@ export function LoginPage() {
 
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">Correo</label>
-                        <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                            disabled={isLoading}
-                            className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60"
-                            placeholder="sudo@potros.itson.edu.mx"
-                        />
+                        <div className="flex items-center overflow-hidden rounded-lg border border-border focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+                            <input
+                                type="text"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value.replace(/\s/g, ''))}
+                                required
+                                disabled={isLoading}
+                                className="min-w-0 flex-1 bg-background px-4 py-2.5 text-sm text-foreground outline-none disabled:opacity-60"
+                                placeholder="tu.nombreID"
+                            />
+                            <span className="shrink-0 select-none border-l border-border bg-muted px-3 py-2.5 text-sm text-muted-foreground">
+                                {ALLOWED_DOMAIN}
+                            </span>
+                        </div>
                     </div>
 
                     <div className="space-y-2">
@@ -99,7 +107,7 @@ export function LoginPage() {
 
                     <button
                         type="submit"
-                        disabled={isLoading}
+                        disabled={isLoading || !username.trim()}
                         className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
                     >
                         {isLoading ? (
