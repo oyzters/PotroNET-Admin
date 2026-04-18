@@ -1,11 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate, NavLink, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { ToastProvider } from '@/contexts/ToastContext';
 import { LoginPage } from '@/pages/LoginPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { UsersPage } from '@/pages/UsersPage';
 import { PublicationsPage } from '@/pages/PublicationsPage';
 import { ReportsPage } from '@/pages/ReportsPage';
 import { ProfessorRequestsPage } from '@/pages/ProfessorRequestsPage';
+import { ProfessorsPage } from '@/pages/ProfessorsPage';
 import { AdminNotificationsPage } from '@/pages/AdminNotificationsPage';
 import { ModerationLogPage } from '@/pages/ModerationLogPage';
 import { SystemSettingsPage } from '@/pages/SystemSettingsPage';
@@ -72,7 +74,8 @@ function AdminLayout({ children }: { children: ReactNode }) {
         { to: '/users', icon: UsersIcon, label: 'Usuarios' },
         { to: '/publications', icon: FileTextIcon, label: 'Publicaciones' },
         { to: '/reports', icon: AlertTriangleIcon, label: 'Reportes' },
-        { to: '/professor-requests', icon: GraduationCapIcon, label: 'Profesores' },
+        { to: '/professors', icon: GraduationCapIcon, label: 'Profesores' },
+        { to: '/professor-requests', icon: GraduationCapIcon, label: 'Solicitudes prof.' },
         { to: '/notifications', icon: BellIcon, label: 'Notificaciones' },
         { to: '/moderation-log', icon: ClipboardListIcon, label: 'Log de Moderación' },
         { to: '/system-settings', icon: SettingsIcon, label: 'Ajustes del Sistema' },
@@ -144,6 +147,7 @@ export function App() {
     return (
         <BrowserRouter>
             <AuthProvider>
+                <ToastProvider>
                 <DesktopOnlyGuard>
                     <Routes>
                         <Route path="/login" element={<LoginPage />} />
@@ -188,6 +192,14 @@ export function App() {
                         }
                     />
                     <Route
+                        path="/professors"
+                        element={
+                            <ProtectedRoute>
+                                <AdminLayout><ProfessorsPage /></AdminLayout>
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
                         path="/notifications"
                         element={
                             <ProtectedRoute>
@@ -222,6 +234,7 @@ export function App() {
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>
                 </DesktopOnlyGuard>
+                </ToastProvider>
             </AuthProvider>
         </BrowserRouter>
     );

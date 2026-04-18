@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
 import { api } from '@/lib/api';
 import {
     SearchIcon,
@@ -8,6 +9,7 @@ import {
     ShieldCheckIcon,
     BanIcon,
     CheckCircleIcon,
+    Trash2Icon,
 } from 'lucide-react';
 
 interface Career {
@@ -35,12 +37,14 @@ interface UsersResponse {
 
 export function UsersPage() {
     const { session, profile } = useAuth();
+    const toast = useToast();
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
+    const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
     const isSudo = profile?.role === 'sudo';
 
@@ -56,12 +60,12 @@ export function UsersPage() {
             setUsers(data.users);
             setTotalPages(data.pagination.totalPages);
             setTotal(data.pagination.total);
-        } catch {
-            //
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'No se pudieron cargar los usuarios');
         } finally {
             setLoading(false);
         }
-    }, [session?.access_token, page, search]);
+    }, [session?.access_token, page, search, toast]);
 
     useEffect(() => {
         fetchUsers();
@@ -76,8 +80,9 @@ export function UsersPage() {
                 body: JSON.stringify({ user_id: userId, role }),
             });
             fetchUsers();
-        } catch {
-            //
+            toast.success('Rol actualizado');
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Error al cambiar el rol');
         }
     };
 
@@ -90,8 +95,30 @@ export function UsersPage() {
                 body: JSON.stringify({ user_id: userId, is_banned: !isBanned }),
             });
             fetchUsers();
-        } catch {
-            //
+            toast.success(isBanned ? 'Usuario desbaneado' : 'Usuario baneado');
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Error al actualizar');
+        }
+    };
+
+    const handleDeleteUser = async (userId: string) => {
+        if (!session?.access_token || !isSudo) return;
+        if (pendingDelete !== userId) {
+            setPendingDelete(userId);
+            window.setTimeout(() => setPendingDelete((cur) => cur === userId ? null : cur), 4000);
+            return;
+        }
+        try {
+            await api(`/admin/users?user_id=${userId}`, {
+                method: 'DELETE',
+                token: session.access_token,
+            });
+            setUsers(prev => prev.filter(u => u.id !== userId));
+            setTotal(t => t - 1);
+            setPendingDelete(null);
+            toast.success('Usuario eliminado');
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Error al eliminar usuario');
         }
     };
 
@@ -216,6 +243,24 @@ export function UsersPage() {
                                                     >
                                                         {u.is_banned ? 'Desbanear' : 'Banear'}
                                                     </button>
+                                                    {u.id !== profile?.id && (
+                                                        pendingDelete === u.id ? (
+                                                            <button
+                                                                onClick={() => handleDeleteUser(u.id)}
+                                                                className="rounded bg-red-500 px-2 py-1 text-xs font-semibold text-white hover:bg-red-600"
+                                                            >
+                                                                Confirmar
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => handleDeleteUser(u.id)}
+                                                                className="rounded p-1 text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
+                                                                title="Eliminar usuario (auth + datos)"
+                                                            >
+                                                                <Trash2Icon className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        )
+                                                    )}
                                                 </div>
                                             </td>
                                         )}
